@@ -1,0 +1,681 @@
+---
+title: "Examen Mod 1"
+author: "Natalia Blanco"
+date: "2023-05-11"
+output: 
+  html_document:
+    toc: true
+    toc_depth: 3
+    number_sections: FALSE
+    toc_float:
+      smooth_scroll: FALSE
+      collapsed: FALSE
+  
+---
+<style>
+#TOC {
+  color: #708090
+  font-family: Calibri;
+  font-size: 16px;
+  border-color: #708090;
+}
+body {
+  color: #708090;
+  font-family: Calibri; 
+  background-color: #F5F5F5;
+}
+pre {
+  color: #708090;
+  background-color: #F8F8FF;
+}
+#header{
+  color: darkcyan;
+  background-color: aliceblue;
+  opacity: 0.8;
+  font-family: Calibri;
+  font-size: 20px;
+}
+</style>
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Parte 1
+
+## Preguntas 
+
+**1.	Describir autocorrelación espacial, autocorrelación espacial positiva, y autocorrelación espacial negativa.**
+
+-	La autocorrelación espacial determina la presencia de variación espacial en una variable. 
+
+-	Cuando hay presencia de autocorrelación espacial positiva significa que los espacios cercanos tienen valores similares se puede visualizar con la presencia de clusters en un mapa. 
+
+-	Cuando hay correlación espacial negativa significa que los espacios cercanos tienen valores diferentes entre sí, un ejemplo seria si en un vecindario hay casa de diferentes precios unos siendo muy altos y unos muy bajos. 
+
+
+**2.	Describir al menos 3-5 diferencias entre análisis exploratorio de datos (EDA) y análisis exploratorio espacial de datos (ESDA).**
+
+-	En el EDA análisis exploratorio de datos se analizan y se busca encontrar patrones entre las variables de una serie de datos por medio de la elaboración de gráficos, correologramas, visualizaciones etc. 
+
+-	En el ESDA se busca encontrar patrones y/o relaciones en una serie de datos espaciales por medio de la elaboración de mapas. 
+
+-	Para elaborar el ESDA es necesario tener datos espaciales ya que se utilizan ubicaciones y atributos geográficos.
+
+
+**3.	Describir los conceptos de autocorrelación espacial y no estacionariedad en un contexto de análisis espacial de datos.**
+
+-	La autocorrelación espacial determina la variación espacial o la ausencia de esta entre los espacios cercanos en una variable, es importante determinar la presencia o ausencia de autocorrelación espacial en un análisis espacial de datos ya que permiten un mejor entendimiento del comportamiento de los datos, así mismo nos ayuda a identificar si es necesario a ver un cambio en las variables.
+
+-	La no estacionariedad se presenta cuando propiedades en una variable o base de datos cambian con el tiempo y no son consistentes a lo largo de un periodo de tiempo. En un contexto espacial de datos la no estacionariedad se presenta cuando existen valores extremos en un área esto puede ser valores muy bajos y muy altos. Un ejemplo de esto podría ser la pobreza en México ya que esta es muy alta en unas regiones y muy baja en otras a lo largo del país. 
+
+
+**4.	Describir al menos 3-5 diferencias entre GWR y GRF.**
+
+-	GFR utiliza una versión local de machine learning para determinar la existencia de no estacionariedad espacial.
+
+-	GRF modela la no estacionariedad junto con un modelo no lineal flexible.
+
+-	El GRF es difícil de overfit debido a sus técnicas de bootstrapping
+
+-	El propósito de GRF es servir como una conexión entre el machine learning y los modelos geográficos ya que combina la capacidad de hacer inferencias y brindar explicaciones.
+
+
+**5.	Describir al menos 3-5 diferencias entre la estimación de modelo de regresión no espacial, espacial global, y espacial local.**
+
+-	El modelo de regresión no espacial no utiliza datos espaciales y se puede conducir con una base de datos regular. 
+
+-	El modelo espacial local ajusta una ecuación de regresión a cada característica presente en el conjunto de datos lo que le permite obtener resultados locales.
+
+-	El modelo espacial global no diferencia entre las diferentes regiones. 
+
+
+
+**Referencias**
+
+Abdishakur. (2019, November 5). What is Exploratory Spatial Data Analysis (ESDA)?. Medium. https://towardsdatascience.com/what-is-exploratory-spatial-data-analysis-esda-335da79026ee 
+
+Geographically weighted Random Forest. R Documentation. (n.d.). https://search.r-project.org/CRAN/refmans/SpatialML/html/grf.html 
+
+Geographically weighted regression (GWR) (spatial statistics). Geographically Weighted Regression (GWR) (Spatial Statistics)-ArcGIS Pro | Documentation. (n.d.). https://pro.arcgis.com/en/pro-app/latest/tool-reference/spatial-statistics/geographicallyweightedregression.htm 
+
+Kanade, V. A. (2022, August 17). What is spatial analysis? definition and examples. Spiceworks. https://www.spiceworks.com/tech/artificial-intelligence/articles/what-is-spatial-analysis/ 
+
+Regression Analysis Basics. Regression analysis basics-ArcGIS Pro | Documentation. (n.d.). https://pro.arcgis.com/en/pro-app/latest/tool-reference/spatial-statistics/regression-analysis-basics.htm#:~:text=Regression%20analysis%20allows%20you%20to,factors%20behind%20observed%20spatial%20patterns 
+
+What is exploratory data analysis?. IBM. (n.d.). https://www.ibm.com/topics/exploratory-data-analysis
+
+Presentación (MODULE 1: SPATIAL DATA ANALYSIS)
+
+
+# Parte 2 
+
+```{r message=FALSE, warning=FALSE}
+library(sf)
+library(dplyr)
+library(tmap)
+library(spdep)
+library(rgdal)
+library(tidyverse)
+library(tigris)
+library(mapview)
+library(GWmodel)    
+library(regclass)
+library(viridis)
+library(grid)
+library(RColorBrewer)
+library(rgeoda)
+library(sjPlot)
+library(jtools)
+library(dlookr)
+library(terra)
+library(ggpubr)
+library(rstatix)
+library(maptools)
+library(SpatialML)
+library(spgwr)
+library(grid)
+```
+
+**Importar los datos**
+```{r}
+### 
+data(columbus) ### dataset 
+columbus_shp <- readShapePoly(system.file("etc/shapes/columbus.shp",package="spdep")) 
+### shapefile 
+col.gal.nb <- read.gal(system.file("etc/weights/columbus.gal", package="spdep")) 
+### spatial connectivity matrix but it requires to calculate the spatial weights.
+##
+```
+
+**Limpieza de datos**
+
+```{r}
+summary(col.gal.nb)
+```
+
+```{r}
+summary(columbus)
+```
+
+Cambiar nombre de la variable que se repite. 
+```{r}
+colnames(columbus)[1] <- "Area"
+```
+
+Cambiar 0 a 0.0001 
+```{r}
+columbus$OPEN <- replace(columbus$OPEN, columbus$OPEN == 0, 0.0001)
+```
+
+
+```{r}
+summary(columbus_shp)
+```
+
+Cambiar 0 a 0.0001 
+```{r}
+columbus_shp$OPEN <- replace(columbus_shp$OPEN, columbus_shp$OPEN == 0, 0.0001)
+```
+
+
+# Análisis Exploratorio de Datos (EDA) 
+
+Crear un data set con las variables que se usaran en el corplot 
+```{r}
+corp <- columbus %>% select(AREA,PERIMETER, NEIG, HOVAL, INC, CRIME, OPEN, PLUMB, PLUMB, DISCBD,
+                            NSA, NSB, EW, CP, NEIGNO)
+```
+
+
+**Corplot**
+```{r}
+correlate(corp, AREA,PERIMETER, NEIG, HOVAL, INC, CRIME, OPEN, PLUMB, PLUMB, DISCBD,
+                            NSA, NSB, EW, CP, NEIGNO) %>% plot()
+```
+
+En base al corplot las variables que elegí para conducir el análisis debido a la correlación que estas tienen con la variable dependiente (HOVAL) son las siguientes: 
+
+- HOVAL (variable dependiente): Valor de la vivienda (en \$1,000) USD
+
+- DISCBD: Distancia al business district.
+
+- CRIME: Robos residenciales y robos de vehículos por cada mil hogares en el vecindario.
+
+- INC: Ingresos del hogar (en \$1,000)
+
+- AREA: El área del vecindario en millas cuadradas
+
+
+```{r}
+plot_normality(columbus, HOVAL, DISCBD, CRIME, INC, AREA)
+
+```
+
+- En base a las transformaciones que podemos visualizar en el plot_normality estaré transformando a log la variable dependiente (HOVAL) así como la variable INC ya que al convertirlas a log tienen una mejor distribución. 
+
+
+# Análisis Exploratorio Espacial de los Datos (ESDA)
+
+## Identificar autocorrelación espacial global
+
+**Queen approach**
+```{r}
+swm_qn <- poly2nb(columbus_shp, queen = TRUE)
+```
+
+**Queen contiguity based neighbors map**
+```{r warning=FALSE}
+plot(columbus_shp, borders = 'lightgrey')
+plot(swm_qn, coordinates(columbus_shp), pch = 19, cex = 0.6, add = TRUE, col = "blue")
+title(main = "Queen Contiguity", cex.main = 0.9)
+```
+
+**rook approach**
+```{r}
+swm_r <- poly2nb(columbus_shp, queen = FALSE)
+```
+
+**rook contiguity based neighbors map**
+```{r warning=FALSE}
+plot(columbus_shp, borders = 'lightgrey')
+plot(swm_r, coordinates(columbus_shp), pch = 19, cex = 0.6, add = TRUE, col = "blue")
+title(main = "Rook Contiguity", cex.main = 0.9)
+```
+
+- Estandaricemos las matrices de conectividad espacial queen y rook (W significa ponderado) para poder asignar mayor importancia (peso) a los vecinos más cercanos que a los vecinos distantes.
+
+```{r}
+rswm_qn <- nb2listw(swm_qn, style = "W", zero.policy = TRUE)
+rswm_r  <- nb2listw(swm_r, style = "W", zero.policy = TRUE)
+```
+
+
+**Global Moran’s I Test**
+
+
+HOVAL
+```{r}
+moran.test(columbus_shp$HOVAL, listw = rswm_qn, zero.policy = TRUE, na.action = na.omit)
+```
+
+- En base a los resultados podemos concluir que hay autocorrelación espacial positiva.
+
+
+DISCBD
+```{r}
+moran.test(columbus_shp$DISCBD, listw = rswm_qn, zero.policy = TRUE, na.action = na.omit)
+```
+- Autocorrelación espacial positiva 
+
+- El resultado del Moran I statistic indica una correlación positiva significativa hacia las observaciones cercanas.
+
+CRIME
+```{r}
+moran.test(columbus_shp$CRIME, listw = rswm_qn, zero.policy = TRUE, na.action = na.omit)
+```
+
+- Autocorrelación espacial positiva 
+
+INC
+```{r}
+moran.test(columbus_shp$INC, listw = rswm_qn, zero.policy = TRUE, na.action = na.omit)
+```
+
+- Autocorrelación espacial positiva 
+
+AREA
+```{r}
+moran.test(columbus_shp$AREA, listw = rswm_qn, zero.policy = TRUE, na.action = na.omit)
+```
+
+- Autocorrelación espacial positiva 
+
+
+**Identificar autocorrelación espacial local**
+
+Crear un spatial lag de las variables de interes.
+```{r}
+columbus_shp$sp_AREA <- lag.listw(rswm_qn, columbus_shp$AREA, zero.policy = TRUE)
+```
+
+```{r}
+columbus_shp$sp_INC <- lag.listw(rswm_qn, columbus_shp$INC , zero.policy = TRUE)
+```
+
+```{r}
+columbus_shp$sp_CRIME <- lag.listw(rswm_qn, columbus_shp$CRIME , zero.policy = TRUE)
+```
+
+```{r}
+columbus_shp$sp_DISCBD <- lag.listw(rswm_qn, columbus_shp$DISCBD , zero.policy = TRUE)
+```
+
+```{r}
+columbus_shp$sp_HOVAL <- lag.listw(rswm_qn, columbus_shp$HOVAL , zero.policy = TRUE)
+```
+
+
+**Clusters**
+
+**HOVAL**
+```{r}
+qtm(columbus_shp, "HOVAL")
+qtm(columbus_shp, "sp_HOVAL")
+```
+
+- Se pueden notar clusters en el mapa indicando lo que indica autocorrelación espacial positiva 
+
+**AREA**
+```{r}
+qtm(columbus_shp, "AREA")
+qtm(columbus_shp, "sp_AREA")
+```
+
+- En comparación con el mapa normal podemos notar un cluster de valores altos al norte y otro al este de Columbus.
+
+- Existe presencia de autocorrelación espacial positiva 
+
+
+**INC**
+```{r}
+qtm(columbus_shp, "INC")
+qtm(columbus_shp, "sp_INC")
+```
+
+- Podemos notar clusters de valores altos en las áreas del sur, sureste y oeste de Columbus.
+
+- Existe presencia de autocorrelación espacial positiva 
+
+
+**CRIME**
+```{r}
+qtm(columbus_shp, "CRIME")
+qtm(columbus_shp, "sp_CRIME")
+```
+
+- Podemos notar una alta concentración de crimen en el centro y sur de Columbus.
+
+- Existe presencia de autocorrelación espacial positiva 
+
+
+**DISCBD**
+```{r}
+qtm(columbus_shp, "DISCBD")
+qtm(columbus_shp, "sp_DISCBD")
+```
+
+- Los cluster en este mapa son muy notorios, podemos observar clusters de valores altos en las áreas norte, este y oeste de Columbus y un cluster de valores bajos en la zona centro.
+
+- Existe presencia de autocorrelación espacial positiva 
+
+
+
+# Estimación de Modelos de Predicción
+
+## Modelo no espacial
+
+```{r}
+modelo1_no_s <- lm(log(HOVAL) ~ DISCBD + CRIME + log(INC) + AREA, data = columbus)
+
+summary(modelo1_no_s)
+```
+
+
+**Multicolinealidad (VIF)**
+
+```{r}
+VIF(modelo1_no_s)
+```
+
+
+**Lagrange Multiplier Diagnostic for Spatial Dependence (LMlag)**
+
+```{r}
+lm.LMtests(modelo1_no_s, rswm_qn, test = c("RLMlag"))
+```
+
+- El p-value es menor a 5% por lo tanto es necesario incluir el spatial lag de la variable dependiente en el modelo. 
+ 
+
+**Lagrange Multiplier Diagnostic for Spatial Error Dependence (LMerr)**
+
+```{r}
+lm.LMtests(modelo1_no_s, rswm_qn, test = c("RLMerr"))
+```
+
+**AIC**
+```{r}
+AIC(modelo1_no_s)
+```
+- En base al AIC podemos concluir que este modelo no es bueno. 
+
+
+Spatial lag de la variable dependiente 
+```{r}
+columbus$sp_HOVAL <- lag.listw(rswm_qn, columbus$HOVAL, zero.policy = TRUE)
+```
+
+
+Plot_normality para verificar si es necesario hacer conversión a log.
+```{r}
+plot_normality(columbus, sp_HOVAL)
+```
+
+- Como podemos ver en los histogramas la variable tiene una mejor distribución al hacer la transformación a log. 
+
+**Modelo no espacial con lag en la variable dependiente**
+```{r}
+modelo2_no_s <- lm(log(sp_HOVAL) ~ DISCBD + CRIME + log(INC) + AREA, data = columbus)
+
+summary(modelo2_no_s)
+```
+
+- En base al p-value podemos concluir que el modelo lag es mejor que el modelo original, a continuación compararemos AIC de los modelos y VIF.
+
+
+VIF
+```{r}
+VIF(modelo2_no_s)
+```
+
+- Los resultados indican que no hay multicolinealidad. 
+
+**Lagrange Multiplier Diagnostic for Spatial Dependence (LMlag)**
+
+```{r}
+lm.LMtests(modelo2_no_s, rswm_qn, test = c("RLMlag"))
+```
+
+- El p value es mayor a 5%
+
+**Lagrange Multiplier Diagnostic for Spatial Error Dependence (LMerr)**
+
+```{r}
+lm.LMtests(modelo2_no_s, rswm_qn, test = c("RLMerr"))
+```
+
+**AIC**
+```{r}
+#Modelo original 
+AIC(modelo1_no_s)
+
+#Modelo LAG
+AIC(modelo2_no_s)
+```
+- Podemos notar un gran cambio en el AIC comparando el modelo anterior con 40.8 y este modelo con -12.8, en base a esto podemos determinar que el modelo con spatial lag en la variable dependiente es mucho mejor que el modelo sin spatial lag. 
+
+
+## Modelo Global
+
+**Spatial Durbin Model**
+
+```{r}
+spatial_durb <- lagsarlm(log(sp_HOVAL) ~  DISCBD + CRIME + log(INC) + AREA, data = columbus, rswm_qn, type = "mixed")
+summary(spatial_durb)
+```
+
+- En base al AIC Podemos determinar que este modelo es mejor que el modelo no espacial. 
+
+**Autocorrelación Espacial de los residuales estimados**
+
+```{r}
+moran.test(exp(spatial_durb$residuals), rswm_qn)
+```
+
+- Autocorrelación espacial positiva
+
+
+```{r}
+columbus_shp$spatial_durb_res <- exp(spatial_durb$residuals)
+```
+
+```{r}
+qtm(columbus_shp,"spatial_durb_res" )
+```
+
+## Modelo Local
+
+**Kernel bandwidth**
+
+```{r}
+kb1 <- bw.gwr(log(sp_HOVAL) ~  DISCBD + CRIME + log(INC) + AREA, approach = "AIC", adaptive = T, data = columbus_shp)
+```
+
+**Estimar Geographic Weighted Regression**
+
+```{r}
+loc_gwr <- gwr.basic(log(sp_HOVAL) ~  DISCBD + CRIME + log(INC) + AREA, adaptive = T, data = columbus_shp, bw = kb1)
+```
+
+
+```{r}
+loc_gwr
+```
+
+- En base a los resultados podemos concluir que la variable que explicativa que tiene un mayor efecto en la variable dependiente es DISCBD. 
+
+- En base al AICc y AIC podemos concluir que es te es un buen modelo para explicar el costo de las casas en Columbus.
+
+
+**Interpretación de la variable explicativa más significativa en base al p-value.**
+
+- Por cada unidad de incremento en DISCBD habra un aumento de 0.131521 en HOVAL 
+
+- DISCBD tiene un p-value de 7.60e-05 por lo cual se puede concluir que es significativa. 
+
+
+
+**Mapeo de resultados de GWR**
+
+```{r}
+gwr_sf <- st_as_sf(loc_gwr$SDF)
+gwr_sf
+```
+
+
+
+```{r}
+gwr_sf$y_predicted <- exp(gwr_sf$yhat)
+```
+
+
+```{r}
+tm_shape(gwr_sf) + 
+  tm_polygons(col = "y_predicted", palette = "RdPu", style = "quantile", n=8, title = "Valor en 1,000 USD") +
+  tm_layout(title = 'Valor de viviendas', title.position = c('right', 'top'))
+```
+
+**Visualización de la predicción local de variables explicativas estadísticamente significativas**
+
+Distancia a Business District
+```{r}
+tm_shape(gwr_sf) +
+  tm_polygons(col = "DISCBD_TV", palette = "Reds", style = "quantile" , n=8, title= "t-statistic") + 
+  tm_layout(title = 'Distancia a Business District', title.position = c('right', 'top'))
+```
+
+Taza de Criminalidad
+```{r}
+tm_shape(gwr_sf) +
+  tm_polygons(col = "CRIME_TV", palette = "OrRd", style = "quantile" , n=8, title= "t-statistic") + 
+  tm_layout(title = 'Tasa de Criminalidad', title.position = c('right', 'top'))
+```
+
+R2
+```{r}
+tm_shape(gwr_sf) +
+  tm_polygons(col = "Local_R2", palette = "Blues", style = "quantile" , n=8, title= "R2") + 
+  tm_layout(title = 'Estimación Local R2', title.position = c('right', 'top'))
+```
+
+Regression Residuals
+```{r}
+gwr_sf$exp_res <- exp(gwr_sf$residual)
+tm_shape(gwr_sf) +
+   tm_polygons(col = "exp_res", palette="Greens", style="quantile", n=8, title="Residuals") +
+  tm_layout(title= 'Regression Residuals',  title.position = c('right', 'top'))
+```
+
+**Autocorrelación Espacial de los residuales estimados**
+
+```{r}
+moran.test(gwr_sf$exp_res, rswm_qn)
+```
+
+# Selección de Modelo
+
+
+## Selección de modelo
+
+En base al AIC llegue a la conclusión que el mejor modelo para determinar el precio de las casas en Columbus es el modelo de Regresión espacial local con un AIC de -39.4 en comparación a -17.017 en el modelo global y -12.80212 en el modelo no espacial.
+
+
+##  Hallazgos
+
+- Uno de los principales hayasgos es que la varaible expolicativa con un mayor grado de significancia es DISCBD la cual determina la distancia hasta el Business District sin embargo CRIME no fue una variable significativa en los modelo lo cual me parecio interesante. 
+
+- Al mapear la variable CRIME en el ESDA se observa una concentración en el centro hacia el oeste de Columbus lo cual tiene sentido ya que las casas mas costosas al analizar la variable dependiente HOVAL se encuentran en su mayoría hacia el este de Columbus. 
+
+- De acuerdo al modelo espacial local podemos predecir que por cada unidad de incremento en DISCBD habrá un aumento de 0.131521 en el precio de las casas en Columbus. 
+
+- Al mapear la variable INC Ingresos del hogar (en \$1,000) se puede observar la mayor concentración al este de Columbus lo cual tiene sentido en base al precio de las casas en esa región y la cercanía al Business district. 
+
+- En base al modelo se puede concluir que a lo largo del tiempo habrá un aumento en el precio de las casas que se encuentran en el este de Columbus. 
+- Podemos concluir que el área mas pobre de Columbus es en donde hay una concentración mas alta de crimen esta área se encuentra al centro oeste. 
+
+
+## Visualización de HOVA
+
+```{r}
+qtm(columbus_shp, "HOVAL")
+```
+
+- Se observa una concentración de valores altos al este y norte de Columbus.
+
+
+# Random Forest 
+
+coordinates
+
+```{r}
+coordss <- coordinates(columbus_shp)
+head(coordss)
+```
+Data para el Random Forest
+
+```{r}
+rf_dat <- columbus %>% select(AREA, INC, CRIME, DISCBD, sp_HOVAL)
+
+rf_dat <- rf_dat %>% mutate(across(c(sp_HOVAL, INC), function(x) log(x)))
+
+formula_rf <- "sp_HOVAL ~ DISCBD + CRIME + INC + AREA"
+```
+
+**Optimal Bandwidth Selection**
+
+Lo decidí hacer con un mínimo de 37 y máximo de 42 porque entre esos intervalos se encontraba el AIC más bajo del Kernel bandwidth
+
+```{r}
+bwgrf <- grf.bw(formula = formula_rf, dataset = rf_dat, kernel = "adaptive", coords = coordss, bw.min = 37, bw.max = 42, step = 1, trees = 500, mtry = NULL, importance = "impurity", forests = FALSE, weighted = TRUE, verbose = TRUE)
+```
+
+**GRF Estimation**
+
+```{r}
+grf_model <- grf(formula = formula_rf, dframe = rf_dat, bw = bwgrf$Best.BW, ntree = 500, mtry = 2, kernel = "adaptive", forests = TRUE, coords = coordss)
+```
+
+- En base al AIC este es el mejor modelo de predicción para los precios de las casas en Columbus.
+
+
+**Visualización de resultados estimados de GRF**
+
+Variable dependiente
+```{r}
+columbus_shp$grf_predicteddv <- grf_model$LGofFit$LM_yfitPred
+tm_shape(columbus_shp) + 
+  tm_polygons(col = "grf_predicteddv", palette="RdPu", style="quantile", n=8, title="Valor en 1,000 USD") +
+  tm_layout(title= 'GRF Predicted Valor de viviendas',  title.position = c('right', 'top'))
+```
+
+local R2
+```{r}
+columbus_shp$grf_localR2 <- grf_model$LGofFit$LM_Rsq100
+tm_shape(columbus_shp) + 
+   tm_polygons(col = "grf_localR2", palette="Greens", style="quantile", n=8, title="R2") +
+  tm_layout(title= 'GRF (Spatial ML) Estimated Local R2',  title.position = c('right', 'top'))
+```
+
+
+- Podemos observar clusters en este mapa teniendo una concentracion de datos altos al sureste de Columbus y una concentración de datos bajos en toda la sona oeste.
+
+
+
+
+
+
+
+
+
